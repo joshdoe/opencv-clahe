@@ -1,10 +1,17 @@
-// *****************************************************************************
-// OpenCV : Contract Limited Adaptive Histogram Equaliztion (CLAHE) Interface
-
-// Author : Toby Breckon, toby.breckon@cranfield.ac.uk
-
+//*****************************************************************************
+// Contrast Limited Adaptive Histogram Equalization (CLAHE) for OpenCV
+//-----------------------------------------------------------------------------
+// Original CLAHE implementation by Karel Zuiderveld, karel@cv.ruu.nl
+// in "Graphics Gems IV", Academic Press, 1994.
+//-----------------------------------------------------------------------------
+// Converted to OpenCV format by Toby Breckon, toby.breckon@cranfield.ac.uk
 // Copyright (c) 2009 School of Engineering, Cranfield University
 // License : LGPL - http://www.gnu.org/licenses/lgpl.html
+//-----------------------------------------------------------------------------
+// Improved by Shervin Emami on 17th Nov 2010, shervin.emami@gmail.com
+// http://www.shervinemami.co.cc/
+//*****************************************************************************
+
 
 #include <cv.h>       // open cv general include file
 
@@ -55,11 +62,11 @@ void cvCLAdaptEqualize(IplImage *src, IplImage *dst,
   After raising error, control will be transferred to the exit label.
 */
 
+#undef CV_ERROR
 #define CV_ERROR( Code, Msg )                                       \
 {                                                                   \
      cvError( (Code), "CLAHE code", Msg, __FILE__, __LINE__ );       \
      exit(1);                                                          \
 }
-
 			
 // *****************************************************************************

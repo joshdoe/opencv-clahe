@@ -1,10 +1,17 @@
-// *****************************************************************************
-// OpenCV : Contract Limited Adaptive Histogram Equaliztion (CLAHE) Interface
-
-// Author : Toby Breckon, toby.breckon@cranfield.ac.uk
-
+//*****************************************************************************
+// Contrast Limited Adaptive Histogram Equalization (CLAHE) for OpenCV
+//-----------------------------------------------------------------------------
+// Original CLAHE implementation by Karel Zuiderveld, karel@cv.ruu.nl
+// in "Graphics Gems IV", Academic Press, 1994.
+//-----------------------------------------------------------------------------
+// Converted to OpenCV format by Toby Breckon, toby.breckon@cranfield.ac.uk
 // Copyright (c) 2009 School of Engineering, Cranfield University
 // License : LGPL - http://www.gnu.org/licenses/lgpl.html
+//-----------------------------------------------------------------------------
+// Improved by Shervin Emami on 17th Nov 2010, shervin.emami@gmail.com
+// http://www.shervinemami.co.cc/
+//*****************************************************************************
+
 
 #include <cv.h>       // open cv general include file
 
@@ -108,7 +115,8 @@ void cvCLAdaptEqualize(IplImage *src, IplImage *dst,
     	if( type != CV_8UC1 )
         	CV_ERROR( CV_StsUnsupportedFormat, "Only 8uC1 images are supported" );
 	
-	if( !CV_ARE_SIZES_EQ( src, dst ))
+	//if( !CV_ARE_SIZES_EQ( src, dst ))	// Modified by Shervin Emami, 17Nov2010.
+	if (src->width != dst->width || src->height != dst->height)
         	CV_ERROR( CV_StsUnmatchedSizes, "src and dst images must be equal sizes" );
 
 	if (((xdivs < 2) || (xdivs > 16)) || ((ydivs < 2) || (ydivs > 16)))
@@ -116,18 +124,41 @@ void cvCLAdaptEqualize(IplImage *src, IplImage *dst,
 
 	if ((bins < 2) || (bins > 256))
 		CV_ERROR( CV_StsBadFlag, "bins must in range (MIN=2 MAX = 256)" );
-	
+
+	// copy src to dst for in-place CLAHE.
+	cvCopy(src, dst);
+
+
+	// If the dimensions of the image are not a multiple of the xdivs and ydivs, then enlarge the image to be a correct size and then shrink the image.
+	// Also make sure the image is aligned to 8 pixels width, so that OpenCV won't add extra padding to the image.
+	// Added by Shervin Emami, 17Nov2010.
+	int enlarged = 0;
+	int origW = dst->width;
+	int origH = dst->height;
+	IplImage *tmpDst = 0;
+	if ((dst->width & (8-1)) || (dst->height & (8-1)) || (dst->width % xdivs) || (dst->height % ydivs)) {
+		int newW = ((dst->width + 8-1) & -8);	// Align to 8 pixels, so that widthStep hopefully equals width.
+		newW = ((newW + xdivs-1) & -xdivs);		// Also align for CLAHE.
+		int newH = ((dst->height + ydivs-1) & -ydivs);
+		//std::cout << "w=" << dst->width << ", h=" << dst->height << ". new w = " << newW << ", h = " << newH << std::endl;
+		IplImage *enlargedDst = cvCreateImage(cvSize(newW, newH), dst->depth, dst->nChannels);
+		cvResize(dst, enlargedDst, CV_INTER_CUBIC);
+		//cvReleaseImage(&dst);
+		tmpDst = dst;
+		dst = enlargedDst;	// Use the enlarged image instead of the original dst image.
+		enlarged = 1;	// signal that we need to shrink later!
+	}
+	// Check if OpenCV adds padding bytes on each row. Added by Shervin Emami, 17Nov2010.
+	if (dst->width != dst->widthStep)
+		CV_ERROR( CV_StsBadFlag, "dst->widthStep should be the same as dst->width. The IplImage has padding, so use a larger image." );
+
+
 	// check number of xdivs and ydivs is a multiple of image dimensions
-	
 	if (dst->width % xdivs)
 		CV_ERROR( CV_StsBadFlag, "xdiv must be an integer multiple of image width " );
 	if (dst->height % ydivs)
 		CV_ERROR( CV_StsBadFlag, "ydiv must be an integer multiple of image height " );
-	
-	// copy src to dst for in-place CLAHE
-	
-	cvCopy(src, dst);
-	
+		
 	// get the min and max values of the image
 	
 	if (range == CV_CLAHE_RANGE_INPUT) {
@@ -141,12 +172,19 @@ void cvCLAdaptEqualize(IplImage *src, IplImage *dst,
 	// call CLHAHE for in-place CLAHE
 	
 	//int rcode = 
-	CLAHE((kz_pixel_t*) (dst->imageData), (unsigned int) src->width, (unsigned int) 
-	src->height, (kz_pixel_t) min, (kz_pixel_t) max, (unsigned int) xdivs, (unsigned int) ydivs,
+	CLAHE((kz_pixel_t*) (dst->imageData), (unsigned int) dst->width, (unsigned int) 
+	dst->height, (kz_pixel_t) min, (kz_pixel_t) max, (unsigned int) xdivs, (unsigned int) ydivs,
               (unsigned int) bins, (float) limit);
 
 	//printf("RCODE %i\n", rcode);	
 
+	// If the dst image was enlarged to fit the alignment, then shrink it back now.
+	// Added by Shervin Emami, 17Nov2010.
+	if (enlarged) {
+		//std::cout << "w=" << dst->width << ", h=" << dst->height << ". orig w=" << origW << ", h=" << origH << std::endl;
+		cvResize(dst, tmpDst, CV_INTER_CUBIC);	// Shrink the enlarged image back into the original dst image.
+		cvReleaseImage(&dst);	// Free the enlarged image.
+	}
 }
 			
 // *****************************************************************************
